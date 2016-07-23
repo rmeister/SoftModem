@@ -3,6 +3,10 @@
 
 #include <Arduino.h>
 
+#if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__)
+#define ATTINY 1
+#endif
+
 //#define SOFT_MODEM_BAUD_RATE   (126)
 //#define SOFT_MODEM_LOW_FREQ    (882)
 //#define SOFT_MODEM_HIGH_FREQ   (1764)

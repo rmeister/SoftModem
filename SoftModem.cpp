@@ -2,7 +2,11 @@
 
 #define TX_PIN  (3)
 #define RX_PIN1 (6)  // AIN0
+
+#ifndef ATTINY
 #define RX_PIN2 (7)  // AIN1
+#endif
+
 
 SoftModem *SoftModem::activeObject = 0;
 
@@ -76,9 +80,11 @@ void SoftModem::begin(void)
 	pinMode(RX_PIN1, INPUT);
 	digitalWrite(RX_PIN1, LOW);
 	
+#ifndef ATTINY
 	pinMode(RX_PIN2, INPUT);
 	digitalWrite(RX_PIN2, LOW);
-	
+#endif
+
 	pinMode(TX_PIN, OUTPUT);
 	digitalWrite(TX_PIN, LOW);
 	
@@ -96,26 +102,46 @@ void SoftModem::begin(void)
 	
 	SoftModem::activeObject = this;
 	
+#ifdef ATTINY
+	_lastTCNT = TCNT0;
+#else
 	_lastTCNT = TCNT2;
+#endif
 	_lastDiff = _lowCount = _highCount = 0;
 	
+#ifdef ATTINY
+	TCCR0A = 0;
+	TCCR0B = TIMER_CLOCK_SELECT;
+	ACSR   = _BV(ACIE) | _BV(ACIS1);
+	DIDR0  = _BV(AIN1D) | _BV(AIN0D);
+#else
 	TCCR2A = 0;
 	TCCR2B = TIMER_CLOCK_SELECT;
 	ACSR   = _BV(ACIE) | _BV(ACIS1);
 	DIDR1  = _BV(AIN1D) | _BV(AIN0D);
+#endif
 }
 
 void SoftModem::end(void)
 {
 	ACSR   &= ~(_BV(ACIE));
+#ifdef ATTINY
+	TIMSK &= ~(_BV(OCIE0A));
+	DIDR0  &= ~(_BV(AIN1D) | _BV(AIN0D));
+#else
 	TIMSK2 &= ~(_BV(OCIE2A));
 	DIDR1  &= ~(_BV(AIN1D) | _BV(AIN0D));
+#endif
 	SoftModem::activeObject = 0;
 }
 
 void SoftModem::demodulate(void)
 {
+#ifdef ATTINY
+	uint8_t t = TCNT0;
+#else
 	uint8_t t = TCNT2;
+#endif
 	uint8_t diff;
 	
 	diff = t - _lastTCNT;
@@ -143,9 +169,15 @@ void SoftModem::demodulate(void)
 				_recvStat = START_BIT;
 				_highCount = 0;
 				_recvBits  = 0;
+#ifdef ATTINY
+				OCR0A = t + (uint8_t)(TCNT_BIT_PERIOD) - _lowCount;
+				TIFR |= _BV(OCF0A);
+				TIMSK |= _BV(OCIE0A);
+#else
 				OCR2A = t + (uint8_t)(TCNT_BIT_PERIOD) - _lowCount;
 				TIFR2 |= _BV(OCF2A);
 				TIMSK2 |= _BV(OCIE2A);
+#endif
 			}
 		}
 	}
@@ -216,14 +248,22 @@ void SoftModem::recv(void)
 	else{
 	end_recv:
 		_recvStat = INACTIVE;
+#ifdef ATTINY
+		TIMSK &= ~_BV(OCIE0A);
+#else
 		TIMSK2 &= ~_BV(OCIE2A);
+#endif
 	}
 }
 
 // Timer 2 compare match interrupt A
 ISR(TIMER2_COMPA_vect)
 {
+#ifdef ATTINY
+	OCR0A += (uint8_t)TCNT_BIT_PERIOD;
+#else
 	OCR2A += (uint8_t)TCNT_BIT_PERIOD;
+#endif
 	SoftModem::activeObject->recv();
 #if SOFT_MODEM_DEBUG_ENABLE
 	*_portLEDReg ^= _portLEDMask;
@@ -270,15 +310,27 @@ void SoftModem::modulate(uint8_t b)
 	do {
 		cnt--;
 		{
+#ifdef ATTINY
+			OCR0B += tcnt;
+			TIFR |= _BV(OCF0B);
+			while(!(TIFR & _BV(OCF0B)));
+#else
 			OCR2B += tcnt;
 			TIFR2 |= _BV(OCF2B);
 			while(!(TIFR2 & _BV(OCF2B)));
+#endif
 		}
 		*_txPortReg ^= _txPortMask;
 		{
+#ifdef ATTINY
+			OCR0B += tcnt2;
+			TIFR |= _BV(OCF0B);
+			while(!(TIFR & _BV(OCF0B)));
+#else
 			OCR2B += tcnt2;
 			TIFR2 |= _BV(OCF2B);
 			while(!(TIFR2 & _BV(OCF2B)));
+#endif
 		}
 		*_txPortReg ^= _txPortMask;
 	} while (cnt);
