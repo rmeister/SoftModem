@@ -1,7 +1,12 @@
 #include "SoftModem.h"
 
+#ifdef ATTINY
+#define TX_PIN  (1)
+#define RX_PIN1 (0)  // AIN0
+#else
 #define TX_PIN  (3)
 #define RX_PIN1 (6)  // AIN0
+#endif
 
 #ifndef ATTINY
 #define RX_PIN2 (7)  // AIN1
