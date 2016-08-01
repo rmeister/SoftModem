@@ -23,36 +23,25 @@ SoftModem::~SoftModem() {
 }
 
 #if F_CPU == 16000000
-#if SOFT_MODEM_BAUD_RATE <= 126
-#define TIMER_CLOCK_SELECT	   (7)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(1024))
-#elif SOFT_MODEM_BAUD_RATE <= 315
-#define TIMER_CLOCK_SELECT	   (6)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(256))
-#elif SOFT_MODEM_BAUD_RATE <= 630
-#define TIMER_CLOCK_SELECT	   (5)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(128))
-#elif SOFT_MODEM_BAUD_RATE <= 1225
-#define TIMER_CLOCK_SELECT	   (4)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(64))
-#else
-#define TIMER_CLOCK_SELECT	   (3)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(32))
-#endif
-#else
-#if SOFT_MODEM_BAUD_RATE <= 126
-#define TIMER_CLOCK_SELECT	   (6)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(256))
-#elif SOFT_MODEM_BAUD_RATE <= 315
-#define TIMER_CLOCK_SELECT	   (5)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(128))
-#elif SOFT_MODEM_BAUD_RATE <= 630
-#define TIMER_CLOCK_SELECT	   (4)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(64))
-#else
-#define TIMER_CLOCK_SELECT	   (3)
-#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(32))
-#endif
+	#if SOFT_MODEM_BAUD_RATE <= 126
+		#define TIMER_CLOCK_SELECT	   (7)
+		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(1024))
+	#elif SOFT_MODEM_BAUD_RATE <= 315
+		#define TIMER_CLOCK_SELECT	   (6)
+		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(256))
+	#elif SOFT_MODEM_BAUD_RATE <= 630
+		#define TIMER_CLOCK_SELECT	   (5)
+		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(128))
+	#elif SOFT_MODEM_BAUD_RATE <= 1225
+		#define TIMER_CLOCK_SELECT	   (4)
+		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(64))
+	#else
+		#define TIMER_CLOCK_SELECT	   (3)
+		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(32))
+	#endif
+#elif (F_CPU == 16500000) && defined(ATTINY)
+	#define TIMER_CLOCK_SELECT	   (3)
+	#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(66))
 #endif
 
 #define BIT_PERIOD            (1000000/SOFT_MODEM_BAUD_RATE)
@@ -348,7 +337,11 @@ void SoftModem::modulate(uint8_t b)
 //  ...
 //  Postamble bit after transmission
 
+#ifdef ATTINY
+void SoftModem::write(const uint8_t *buffer, size_t size)
+#else
 size_t SoftModem::write(const uint8_t *buffer, size_t size)
+#endif
 {
 	// To calculate the preamble bit length
 	uint8_t cnt = ((micros() - _lastWriteTime) / BIT_PERIOD) + 1;
@@ -379,10 +372,17 @@ size_t SoftModem::write(const uint8_t *buffer, size_t size)
 	// Postamble bit transmission
 	modulate(HIGH);
 	_lastWriteTime = micros();
+#ifndef ATTINY
 	return n;
+#endif
 }
 
 size_t SoftModem::write(uint8_t data)
 {
+#ifdef ATTINY
+	write(&data, 1);
+	return 1;
+#else
 	return write(&data, 1);
+#endif
 }

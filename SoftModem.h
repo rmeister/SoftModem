@@ -3,8 +3,8 @@
 
 #include <Arduino.h>
 
-#if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__)
-#define ATTINY 1
+#if (defined(__AVR_ATtinyX4__) || defined(__AVR_ATtinyX5__))
+#define ATTINY
 #endif
 
 //#define SOFT_MODEM_BAUD_RATE   (126)
@@ -60,7 +60,11 @@ public:
 	virtual int read();
 	virtual void flush();
 	virtual int peek();
+#ifdef ATTINY
+    virtual void write(const uint8_t *buffer, size_t size);
+#else
     virtual size_t write(const uint8_t *buffer, size_t size);
+#endif
 	virtual size_t write(uint8_t data);
 	void demodulate(void);
 	void recv(void);
