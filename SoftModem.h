@@ -7,6 +7,10 @@
 #define ATTINY
 #endif
 
+#if defined(__AVR_ATmega32U4__)
+#define LEONARDO
+#endif
+
 //#define SOFT_MODEM_BAUD_RATE   (126)
 //#define SOFT_MODEM_LOW_FREQ    (882)
 //#define SOFT_MODEM_HIGH_FREQ   (1764)
@@ -33,7 +37,7 @@
 //#define SOFT_MODEM_RX_BUF_SIZE (32)
 
 #define SOFT_MODEM_DEBUG_ENABLE  (0)
-#define SOFT_MODEM_MOVING_AVERAGE_ENABLE  (0)
+#define SOFT_MODEM_MOVING_AVERAGE_ENABLE  (1)
 
 class SoftModem : public Stream
 {

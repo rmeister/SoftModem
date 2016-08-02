@@ -1,15 +1,17 @@
 #include "SoftModem.h"
 
-#ifdef ATTINY
-#define TX_PIN  (1)
-#define RX_PIN1 (0)  // AIN0
-#else
 #define TX_PIN  (3)
 #define RX_PIN1 (6)  // AIN0
+#define RX_PIN2 (7)  // AIN1
+
+#ifdef ATTINY
+	#define TX_PIN  (1)
+	#define RX_PIN1 (0)  // AIN0
 #endif
 
-#ifndef ATTINY
-#define RX_PIN2 (7)  // AIN1
+#ifdef LEONARDO
+	#define RX_PIN1 (7)  // AIN0
+	#define RX_PIN2 (0)  // AIN1
 #endif
 
 
@@ -33,7 +35,11 @@ SoftModem::~SoftModem() {
 		#define TIMER_CLOCK_SELECT	   (5)
 		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(128))
 	#elif SOFT_MODEM_BAUD_RATE <= 1225
+#ifdef LEONARDO
+		#define TIMER_CLOCK_SELECT	   (3)
+#else
 		#define TIMER_CLOCK_SELECT	   (4)
+#endif
 		#define MICROS_PER_TIMER_COUNT   (clockCyclesToMicroseconds(64))
 	#else
 		#define TIMER_CLOCK_SELECT	   (3)
@@ -96,14 +102,14 @@ void SoftModem::begin(void)
 	
 	SoftModem::activeObject = this;
 	
-#ifdef ATTINY
+#if defined(ATTINY) || defined(LEONARDO)
 	_lastTCNT = TCNT0;
 #else
 	_lastTCNT = TCNT2;
 #endif
 	_lastDiff = _lowCount = _highCount = 0;
 	
-#ifdef ATTINY
+#if defined(ATTINY) || defined(LEONARDO)
 	TCCR0A = 0;
 	TCCR0B = TIMER_CLOCK_SELECT;
 	ACSR   = _BV(ACIE) | _BV(ACIS1);
@@ -119,8 +125,11 @@ void SoftModem::begin(void)
 void SoftModem::end(void)
 {
 	ACSR   &= ~(_BV(ACIE));
-#ifdef ATTINY
+#if defined(ATTINY)
 	TIMSK &= ~(_BV(OCIE0A));
+	DIDR0  &= ~(_BV(AIN1D) | _BV(AIN0D));
+#elif defined(LEONARDO)
+	TIMSK0 &= ~(_BV(OCIE0A));
 	DIDR0  &= ~(_BV(AIN1D) | _BV(AIN0D));
 #else
 	TIMSK2 &= ~(_BV(OCIE2A));
@@ -131,7 +140,7 @@ void SoftModem::end(void)
 
 void SoftModem::demodulate(void)
 {
-#ifdef ATTINY
+#if defined(ATTINY) || defined(LEONARDO)
 	uint8_t t = TCNT0;
 #else
 	uint8_t t = TCNT2;
@@ -159,14 +168,18 @@ void SoftModem::demodulate(void)
 		_lowCount += _lastDiff;
 		if(_recvStat == INACTIVE){
 			// Start bit detection
-			if(_lowCount >= (uint8_t)(TCNT_BIT_PERIOD * 0.5)){
+			if(_lowCount >= (uint8_t)(TCNT_BIT_PERIOD >> 1)){
 				_recvStat = START_BIT;
 				_highCount = 0;
 				_recvBits  = 0;
-#ifdef ATTINY
+#if defined(ATTINY)
 				OCR0A = t + (uint8_t)(TCNT_BIT_PERIOD) - _lowCount;
 				TIFR |= _BV(OCF0A);
 				TIMSK |= _BV(OCIE0A);
+#elif defined(LEONARDO)
+				OCR0A = t + (uint8_t)(TCNT_BIT_PERIOD) - _lowCount;
+				TIFR0 |= _BV(OCF0A);
+				TIMSK0 |= _BV(OCIE0A);
 #else
 				OCR2A = t + (uint8_t)(TCNT_BIT_PERIOD) - _lowCount;
 				TIFR2 |= _BV(OCF2A);
@@ -242,8 +255,10 @@ void SoftModem::recv(void)
 	else{
 	end_recv:
 		_recvStat = INACTIVE;
-#ifdef ATTINY
+#if defined(ATTINY)
 		TIMSK &= ~_BV(OCIE0A);
+#elif defined(LEONARDO)
+		TIMSK0 &= ~_BV(OCIE0A);
 #else
 		TIMSK2 &= ~_BV(OCIE2A);
 #endif
@@ -253,7 +268,7 @@ void SoftModem::recv(void)
 // Timer 2 compare match interrupt A
 ISR(TIMER2_COMPA_vect)
 {
-#ifdef ATTINY
+#if defined(ATTINY) || defined(LEONARDO)
 	OCR0A += (uint8_t)TCNT_BIT_PERIOD;
 #else
 	OCR2A += (uint8_t)TCNT_BIT_PERIOD;
@@ -304,10 +319,14 @@ void SoftModem::modulate(uint8_t b)
 	do {
 		cnt--;
 		{
-#ifdef ATTINY
+#if defined(ATTINY)
 			OCR0B += tcnt;
 			TIFR |= _BV(OCF0B);
 			while(!(TIFR & _BV(OCF0B)));
+#elif defined(LEONARDO)
+			OCR0B += tcnt;
+			TIFR0 |= _BV(OCF0B);
+			while(!(TIFR0 & _BV(OCF0B)));
 #else
 			OCR2B += tcnt;
 			TIFR2 |= _BV(OCF2B);
@@ -316,10 +335,14 @@ void SoftModem::modulate(uint8_t b)
 		}
 		*_txPortReg ^= _txPortMask;
 		{
-#ifdef ATTINY
+#if defined(ATTINY)
 			OCR0B += tcnt2;
 			TIFR |= _BV(OCF0B);
 			while(!(TIFR & _BV(OCF0B)));
+#elif defined(LEONARDO)
+			OCR0B += tcnt2;
+			TIFR0 |= _BV(OCF0B);
+			while(!(TIFR0 & _BV(OCF0B)));
 #else
 			OCR2B += tcnt2;
 			TIFR2 |= _BV(OCF2B);
